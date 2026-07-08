@@ -4,7 +4,7 @@ import os
 import requests
 from dotenv import load_dotenv
 from google.adk.agents import Agent
-from callbacks import log_before_model, log_after_model
+from callbacks import log_before_model, validate_input, log_after_model
 
 load_dotenv()
 
@@ -122,6 +122,6 @@ root_agent = Agent(
         "resolved city name if you looked it up."
     ),
     tools=[get_current_location, get_coordinates_for_city, get_weather],
-    before_model_callback=log_before_model,
+    before_model_callback=[log_before_model, validate_input],
     after_model_callback=log_after_model,
 )

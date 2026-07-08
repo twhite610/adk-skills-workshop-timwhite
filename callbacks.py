@@ -3,12 +3,11 @@ from typing import Optional
 
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.models import LlmRequest, LlmResponse
+from google.genai import types
 
-# Build a dedicated logger with its own file handler, independent of
-# whatever the ADK framework does to the root logger.
 logger = logging.getLogger("weather_agent_callbacks")
 logger.setLevel(logging.INFO)
-logger.propagate = False  # don't let messages bubble up to ADK's root handlers
+logger.propagate = False
 
 if not logger.handlers:
     file_handler = logging.FileHandler("weather_agent.log")
@@ -18,19 +17,23 @@ if not logger.handlers:
     logger.addHandler(file_handler)
 
 
+def _extract_user_text(llm_request: LlmRequest) -> str:
+    """Shared helper: pulls the latest user message text out of a request."""
+    try:
+        last_content = llm_request.contents[-1]
+        return "".join(part.text or "" for part in last_content.parts)
+    except (IndexError, AttributeError):
+        return "<unavailable>"
+
+
 def log_before_model(
     callback_context: CallbackContext, llm_request: LlmRequest
 ) -> Optional[LlmResponse]:
     """
     Logs the user-provided request immediately before it's sent to the LLM.
-    Returning None allows the model call to proceed unmodified.
+    Always returns None so the chain continues to the next callback.
     """
-    try:
-        last_content = llm_request.contents[-1]
-        user_text = "".join(part.text or "" for part in last_content.parts)
-    except (IndexError, AttributeError):
-        user_text = "<unavailable>"
-
+    user_text = _extract_user_text(llm_request)
     logger.info(
         f"REQUEST | agent={callback_context.agent_name} | "
         f"invocation={callback_context.invocation_id} | "
@@ -39,12 +42,37 @@ def log_before_model(
     return None
 
 
+def validate_input(
+    callback_context: CallbackContext, llm_request: LlmRequest
+) -> Optional[LlmResponse]:
+    """
+    Blocks the request if it violates content guidelines.
+    Returning an LlmResponse here short-circuits the chain and the
+    actual model call — nothing after this runs.
+    """
+    user_text = _extract_user_text(llm_request)
+
+    if "BAD" in user_text.upper():
+        logger.info(
+            f"BLOCKED | agent={callback_context.agent_name} | "
+            f"invocation={callback_context.invocation_id} | "
+            f"reason=content_guideline_violation"
+        )
+        return LlmResponse(
+            content=types.Content(
+                role="model",
+                parts=[types.Part(text="Message violates our content guidelines")],
+            )
+        )
+
+    return None
+
+
 def log_after_model(
     callback_context: CallbackContext, llm_response: LlmResponse
 ) -> Optional[LlmResponse]:
     """
     Logs the model's response immediately after it's received.
-    Returning None allows the original response to be used unmodified.
     """
     try:
         response_text = "".join(part.text or "" for part in llm_response.content.parts)
