@@ -1,7 +1,6 @@
 import logging
-from typing import Optional
-
 import re
+from typing import Optional
 
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.models import LlmRequest, LlmResponse

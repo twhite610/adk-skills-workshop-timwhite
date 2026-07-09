@@ -1,6 +1,8 @@
 import logging
 from typing import Optional
 
+import re
+
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.models import LlmRequest, LlmResponse
 from google.genai import types
@@ -52,7 +54,7 @@ def validate_input(
     """
     user_text = _extract_user_text(llm_request)
 
-    if "BAD" in user_text.upper():
+    if re.search(r"\bBAD\b", user_text.upper()):
         logger.info(
             f"BLOCKED | agent={callback_context.agent_name} | "
             f"invocation={callback_context.invocation_id} | "
