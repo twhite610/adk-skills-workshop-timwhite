@@ -128,6 +128,39 @@ Delegation uses ADK's `sub_agents` parameter (full handoff — the sub-agent
 answers directly once selected, rather than the root agent orchestrating a
 blended response).
 
-## Lab 4: *(pending)*
+## Lab 4: Multi-Agent Workflow — Answer Team
+
+**Tag:** `lab4-final`
+
+A multi-agent workflow under `lab4_answer_team/root_agent/` that answers a
+question, then verifies and refines the answer before returning it:
+
+- **`root_agent`** (the "Greeter") — handles greetings/small talk directly;
+  delegates real questions to `answer_team`
+- **`answer_team`** (`SequentialAgent`) — runs three sub-agents in order:
+  - **`search_agent`** — finds data to answer the question, using ADK's
+    built-in `google_search` tool
+  - **`critique_agent`** — reviews the draft answer and suggests specific
+    improvements
+  - **`refine_agent`** — rewrites the answer based on the critique
+
+Request/response logging (from Lab 2's `callbacks.py`) is wired into all
+four agents individually, giving a per-agent debug trace of each turn.
+
+Since ADK's CLI (`adk run`/`adk web`) loads `.env` automatically but a
+plain Python script does not, `test_agent.py` calls `load_dotenv()`
+explicitly before importing the agent.
+
+### Testing
+
+`test_agent.py` exercises the agent programmatically via ADK's
+`InMemoryRunner`, sending a greeting and a real question, and printing each
+event (text, tool calls, tool responses, delegation) as it happens — this
+demonstrates the sub-agents firing without relying on the interactive CLI.
+
+```bash
+cd lab4_answer_team
+python3 test_agent.py
+```
 
 ## Lab 5: *(pending)*
