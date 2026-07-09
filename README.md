@@ -25,6 +25,59 @@ git checkout lab3-final   # Lab 3
 git checkout main         # back to latest
 ```
 
+## Environment Setup
+
+### Requirements
+- Python 3.12+ (Python 3.9 will fail — ADK's MCP features require 3.10+,
+  and some dependencies emit deprecation errors on older versions)
+- Homebrew (for installing Python/gcloud on macOS)
+- Google Cloud CLI (`gcloud`)
+
+### Virtual environments
+- `venv/` — for Lab 1 (Jupyter notebook): `pip install notebook requests python-dotenv`
+- `adk-env/` — for Labs 2–3 (ADK agents): `pip install google-adk python-dotenv requests`
+
+### Required environment variables (`.env`, not committed)
+
+Each lab folder expects its own `.env` file:
+
+GOOGLE_GEO_API_KEY=<Google Geolocation/Geocoding API key>
+GOOGLE_GENAI_USE_VERTEXAI=true
+GOOGLE_CLOUD_PROJECT=<your GCP project ID>
+GOOGLE_CLOUD_LOCATION=us-central1
+
+Note: `GOOGLE_GENAI_USE_VERTEXAI` must be the literal string `true`
+(not `1` or `0`) — this value is read as a string, and anything else
+silently falls back to Gemini's free-tier API-key path, which has a low
+daily request quota.
+
+### Google Cloud authentication
+
+This project authenticates via Vertex AI using Application Default
+Credentials (ADC) rather than a standalone Gemini API key, due to an org
+policy on the training-provided Google account that blocks direct API key
+creation for the Gemini API.
+
+```bash
+gcloud auth login
+gcloud auth application-default login
+gcloud config set project <your-project-id>
+gcloud services enable aiplatform.googleapis.com
+```
+
+Note: enabling `aiplatform.googleapis.com` requires Owner or
+Editor/Service Usage Admin rights on the project. If you hit a
+`PERMISSION_DENIED` error, check **IAM & Admin → IAM** in Cloud Console to
+confirm which account actually holds Owner on the project — it may differ
+from your default `gcloud` login identity.
+
+### Running an agent
+
+```bash
+source adk-env/bin/activate
+adk run <agent_folder>      # CLI
+adk web <agent_folder>      # browser dev UI
+```
 ---
 
 ## Lab 1: Weather Notebook
