@@ -163,4 +163,56 @@ cd lab4_answer_team
 python3 test_agent.py
 ```
 
-## Lab 5: *(pending)*
+## Lab 5: Deploying an Agent to Vertex AI Agent Engine
+
+**Tag:** `lab5-final`
+
+A Jupyter notebook (`lab5_agent_deployment/agent_deployment.ipynb`) that
+takes the Lab 4 answer-team agent and deploys it to Vertex AI Agent Engine
+(referred to in course materials as "Agent Platform"), Google Cloud's
+managed runtime for ADK agents.
+
+The notebook:
+1. Initializes Vertex AI (`vertexai.init(...)`) with the project, location,
+   and a GCS staging bucket
+2. Redefines the `root_agent` / `answer_team` pipeline from Lab 4
+   (search → critique → refine, with request/response logging)
+3. Tests the agent locally via `AdkApp` and `stream_query()` before
+   deploying anything
+4. Deploys the agent with `agent_engines.create()`, bundling `callbacks.py`
+   as an extra package since local files aren't packaged automatically
+5. Tests the **deployed remote agent** with `stream_query()`, confirming
+   both the greeting path (handled directly by `root_agent`) and the
+   delegated research path (search → critique → refine) work identically
+   to local testing
+
+### Notable issues resolved along the way
+
+- **Local files aren't auto-bundled:** `callbacks.py` had to be passed via
+  `extra_packages=["callbacks.py"]` in `agent_engines.create()`, since only
+  installed packages (not local modules) ship with the deployment by
+  default.
+- **Reserved environment variable name:** attempting to pass
+  `GOOGLE_CLOUD_PROJECT` via `env_vars` fails with `FailedPrecondition`,
+  since Agent Engine auto-injects this variable itself. Only
+  `GOOGLE_GENAI_USE_VERTEXAI` needed to be set explicitly.
+- **False-positive content validation:** the Lab 2 input-validation
+  callback (blocking the literal word "BAD") was originally applied to
+  every agent in the pipeline via `before_model_callback`. Since ordinary
+  search results and critiques legitimately contain phrases like "bad
+  cholesterol," this caused real answers to be blocked. Fixed by scoping
+  `validate_input` to `root_agent` only (the actual user-facing input),
+  while keeping `log_before_model` / `log_after_model` on every agent for
+  debug visibility.
+
+### Setup notes specific to this lab
+
+- Requires a GCS staging bucket (created once, reused across deployments):
+```bash
+  gcloud storage buckets create gs://adroit-sol-501711-r0-adk-staging \
+    --location=us-central1 --uniform-bucket-level-access
+```
+- Requires the Vertex AI SDK with deployment extras, plus Jupyter:
+```bash
+  pip install "google-cloud-aiplatform[adk,agent_engines]" notebook
+```
