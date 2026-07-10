@@ -216,3 +216,70 @@ The notebook:
 ```bash
   pip install "google-cloud-aiplatform[adk,agent_engines]" notebook
 ```
+
+## Case Study: ReadyNow! — FEMA Emergency Preparedness Agent
+
+**Tag:** `case-study-final`
+
+A capstone multi-agent system (`case_study_readynow/`) built for a
+simulated FEMA emergency preparedness use case. Combines patterns from
+Labs 1–5 into a single system, plus two new pieces: Google Maps-based
+routing and a Colab Enterprise notebook environment (rather than local
+Jupyter).
+
+**Architecture:** see `case_study_readynow/readynow_architecture.svg`.
+
+- **`root_agent`** — describes its own capabilities on request, enforces
+  mission-scope refusal (declines off-topic requests via its own
+  instructions rather than a keyword filter), and delegates to exactly
+  one specialist team per request
+- **Four specialist teams**, each a `SequentialAgent` of
+  specialist → critique → refine:
+  - **`weather_team`** — real-time conditions and active alerts (NWS API,
+    reused from Labs 1–2)
+  - **`search_team`** — current disaster/news search (`google_search`,
+    reused from Lab 4)
+  - **`routes_team`** — evacuation routes via the Google Routes API
+    (new; called directly via `requests`, no client library)
+  - **`qa_team`** — general safety/preparedness Q&A
+- **Callbacks** — request/response logging on every agent; input
+  validation scoped to `root_agent` only (the true user-facing boundary),
+  per the lesson learned in Lab 5
+
+### Notable issues found and fixed
+
+- **Critique/refine can introduce errors, not just catch them:**
+  `search_critique` initially assumed any date past its training cutoff
+  must be fabricated, and rejected accurate, correctly-dated live search
+  results — on one pass, `search_refine` even silently rewrote a correct
+  date to a wrong one to "resolve" the inconsistency. Fixed by explicitly
+  stating today's actual date as verified ground truth in both agents'
+  instructions, rather than relying on a general "trust the search tool"
+  instruction.
+- **ADK version mismatch on deployment:** deploying without pinning
+  `google-adk` let pip resolve a newer version at deploy time than what
+  was installed locally. The newer remote `Runner` expected an
+  `agent.mode` attribute that didn't exist on the `LlmAgent` class used
+  to pickle the agent locally, causing `stream_query` to fail silently
+  (0 events, no client-side exception) — the real error only appeared in
+  Cloud Logging (`resource.type="aiplatform.googleapis.com/ReasoningEngine"`,
+  log `...%2Freasoning_engine_stderr`). Fixed by pinning
+  `google-adk==<exact local version>` in the deployment's `requirements`.
+- **Local files aren't auto-bundled:** as in Lab 5, tool and callback
+  functions had to be written to disk (`%%writefile tools.py`,
+  `%%writefile callbacks.py`) and passed via `extra_packages` for
+  deployment, since Agent Engine only bundles files, not in-memory
+  notebook objects.
+
+### Environment notes specific to this case study
+
+- Built and run in **Colab Enterprise** (Google Cloud console →
+  Vertex AI), not local Jupyter — authenticates via browser sign-in
+  rather than local `gcloud` ADC.
+- Requires the **Routes API** enabled on the project, with the API key
+  used for `GOOGLE_GEO_API_KEY` explicitly granted access to it (separate
+  from project-level enablement).
+- The Setup cell sets `GOOGLE_GEO_API_KEY` directly via `os.environ`
+  rather than `.env`/`load_dotenv()`, since Colab Enterprise doesn't have
+  access to the local filesystem's `.env` files. **Replace the
+  placeholder key value in that cell with your own key before running.**
